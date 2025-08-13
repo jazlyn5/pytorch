@@ -483,5 +483,76 @@ class TestProvenanceTracingNodeMeta(TestCase):
         self.assertEqual(mm_node.meta["stack_trace"], stack_trace)
 
 
+class TestKernelInformationAOTI(TestCase):
+    def _check_kernel_information_json(self, kernel_info, expected_kernels):
+        """Validate kernel information JSON structure and content."""
+        self.assertIsInstance(kernel_info, dict)
+
+        for expected in expected_kernels:
+            found = any(expected in name for name in kernel_info.keys())
+            self.assertTrue(
+                found,
+                f"Expected kernel {expected} not found in {list(kernel_info.keys())}",
+            )
+
+        for kernel_name, data in kernel_info.items():
+            self.assertIsInstance(data, dict)
+            for field in ["stack_traces", "post_grad_nodes", "pre_grad_nodes"]:
+                self.assertIn(field, data)
+                self.assertIsInstance(data[field], list)
+                for item in data[field]:
+                    self.assertIsInstance(item, str)
+
+    @requires_cuda_and_triton
+    @torch._inductor.config.patch("aot_inductor.package", True)
+    @torch._inductor.config.patch("trace.basic_provenance_tracking", True)
+    def test_kernel_information_generation_basic(self):
+        """Test basic kernel information generation in AOTI packages."""
+        import tempfile
+
+        class SimpleModel(torch.nn.Module):
+            def forward(self, x):
+                return x + x * 2
+
+        model = SimpleModel()
+        x = torch.randn(10, 10, device="cuda")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            so_path = torch._export.aot_compile(model, (x,), package_path=temp_dir)
+
+            json_path = os.path.join(temp_dir, "kernel_information.json")
+            self.assertTrue(os.path.exists(json_path))
+
+            with open(json_path, "r") as f:
+                kernel_info = json.load(f)
+
+            self._check_kernel_information_json(kernel_info, ["triton"])
+
+    @torch._inductor.config.patch("aot_inductor.package", True)
+    def test_kernel_information_disabled(self):
+        """Test that no kernel_information.json is generated without provenance tracking."""
+        import tempfile
+
+        class SimpleModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        model = SimpleModel()
+        x = torch.randn(5, 5)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            so_path = torch._export.aot_compile(model, (x,), package_path=temp_dir)
+
+            json_path = os.path.join(temp_dir, "kernel_information.json")
+            self.assertFalse(os.path.exists(json_path))
+
+    def test_create_kernel_information_json_function(self):
+        """Test the create_kernel_information_json function directly."""
+        from torch._inductor.debug import create_kernel_information_json
+
+        result = create_kernel_information_json()
+        self.assertIsInstance(result, dict)
+
+
 if __name__ == "__main__":
     run_tests()

@@ -44,7 +44,6 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing_extensions import override, Self
 
 import torch
 import torch.distributed as dist
@@ -110,6 +109,7 @@ from torch.export.pt2_archive._package_weights import TensorProperties, Weights
 from torch.export.pt2_archive.constants import CUSTOM_OBJ_FILENAME_PREFIX
 from torch.fx.experimental.symbolic_shapes import has_hint, hint_int, ShapeEnv
 from torch.utils._ordered_set import OrderedSet
+from typing_extensions import override, Self
 
 from .output_code import CompiledFxGraph
 from .remote_cache import create_cache
@@ -424,9 +424,9 @@ def write_atomic(
 ) -> None:
     # Write into temporary file first to avoid conflicts between threads
     # Avoid using a named temporary file, as those have restricted permissions
-    assert isinstance(content, (str, bytes)), (
-        "Only strings and byte arrays can be saved in the cache"
-    )
+    assert isinstance(
+        content, (str, bytes)
+    ), "Only strings and byte arrays can be saved in the cache"
     path = Path(path_)
     if make_dirs:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1319,9 +1319,9 @@ class FxGraphCache(GuardedCache[CompiledFxGraph]):
         """
         from .compile_fx import CompiledFxGraph
 
-        assert isinstance(compiled_graph, CompiledFxGraph), (
-            f"serialization for {type(compiled_graph)} NYI"
-        )
+        assert isinstance(
+            compiled_graph, CompiledFxGraph
+        ), f"serialization for {type(compiled_graph)} NYI"
 
         # Before serializing, compute the guard expression that will be used to
         # ensure that a CompiledFxGraph is valid when loaded from the cache. It's
@@ -1596,9 +1596,9 @@ class CudaKernelParamCache:
     ) -> None:
         basename = None
         if config.aot_inductor.package_cpp_only:
-            assert config.triton.unique_kernel_names, (
-                "package_cpp_only requires triton kernel names to be unique"
-            )
+            assert (
+                config.triton.unique_kernel_names
+            ), "package_cpp_only requires triton kernel names to be unique"
             assert params["mangled_name"], "Missing kernel name"
             basename = params["mangled_name"]
 
@@ -1616,9 +1616,9 @@ class CudaKernelParamCache:
 
         if config.aot_inductor.emit_multi_arch_kernel:
             bin_type_to_ext = {"cubin": ".fatbin", "spv": ".spv"}
-            assert bin_type in bin_type_to_ext.keys(), (
-                "multi_arch_kernel_binary only supported in CUDA/XPU"
-            )
+            assert (
+                bin_type in bin_type_to_ext.keys()
+            ), "multi_arch_kernel_binary only supported in CUDA/XPU"
             base_path, _ = os.path.splitext(bin_path)
             bin_path = base_path + bin_type_to_ext[bin_type]
 
@@ -2045,9 +2045,9 @@ end
                 )
             )
             for k, v in config.aot_inductor.metadata.items():
-                assert isinstance(k, str) and isinstance(v, (str)), (
-                    "Metadata must only contain strings"
-                )
+                assert isinstance(k, str) and isinstance(
+                    v, (str)
+                ), "Metadata must only contain strings"
 
             with open(meta_json, "w") as f:
                 f.write(json.dumps(config.aot_inductor.metadata))
@@ -2268,9 +2268,9 @@ end
             gpu_codecache.aot_kernels_o.clear()
 
             if gpu_kernels_o:
-                assert not config.aot_inductor.emit_multi_arch_kernel, (
-                    "TODO: add emit_multi_arch_kernel support for cutlass kernels"
-                )
+                assert (
+                    not config.aot_inductor.emit_multi_arch_kernel
+                ), "TODO: add emit_multi_arch_kernel support for cutlass kernels"
 
             cubins_o = []
             asm_files = []
@@ -2413,6 +2413,18 @@ end
                     generated_files.append(output_so)
 
         if config.aot_inductor.package:
+            if (
+                config.trace.basic_provenance_tracking
+                or config.trace.provenance_tracking
+            ):
+                kernel_info = torch._inductor.debug.create_kernel_information_json()
+                kernel_info_json = os.path.join(
+                    wrapper_path_operator.parent, "kernel_information.json"
+                )
+                with open(kernel_info_json, "w") as f:
+                    f.write(json.dumps(kernel_info, indent=4))
+                generated_files.append(kernel_info_json)
+
             # We want to return the directory that contains all the AOTI
             # generated files, not just the so
             # return os.path.split(output_so)[0]
@@ -2485,9 +2497,9 @@ def _precompile_header(
     hashable_cmd_line: str,
     **compile_command: Any,
 ) -> str:
-    assert not _IS_WINDOWS, (
-        "CppBuilder does not currently support precompiling on Windows!"
-    )
+    assert (
+        not _IS_WINDOWS
+    ), "CppBuilder does not currently support precompiling on Windows!"
 
     # Get the preprocessed output from the header file to be precompiled.  This allows
     # us to properly invalidate the file cache when any header dependency changes.  This
