@@ -13,6 +13,7 @@ import textwrap
 from collections import Counter
 from typing import Any, Callable, Generic, no_type_check, Optional, TYPE_CHECKING, Union
 from typing_extensions import TypeVar
+import sys
 
 import sympy
 
@@ -1474,7 +1475,19 @@ class SIMDScheduling(BaseScheduling):
                 node.mark_run()
 
         self.codegen_comment(node_schedule)
-        final_kernel.call_kernel(final_kernel.kernel_name)
+
+        enable_kernel_profile = config.cpp.enable_kernel_profile and sys.platform in [
+            "linux",
+            "win32",
+        ]
+
+        if enable_kernel_profile:
+            V.graph.wrapper_code.writeline("{")
+            V.graph.wrapper_code.write_kernel_context_guard(
+                final_kernel.kernel_name, node_schedule
+            )
+            final_kernel.call_kernel(final_kernel.kernel_name)
+            V.graph.wrapper_code.writeline("}")
 
         if config.nan_asserts:
             final_kernel.codegen_nan_check()
